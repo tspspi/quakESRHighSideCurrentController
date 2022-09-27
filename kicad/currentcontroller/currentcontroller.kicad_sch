@@ -2408,7 +2408,7 @@
     (in_bom yes) (on_board yes) (fields_autoplaced)
     (uuid 3db3fc00-95e4-4f1b-b3a5-5adfdb32b1bd)
     (property "Reference" "R?" (id 0) (at 96.52 41.2836 90))
-    (property "Value" "R_Small" (id 1) (at 96.52 43.8205 90))
+    (property "Value" "100R" (id 1) (at 96.52 43.8205 90))
     (property "Footprint" "" (id 2) (at 96.52 45.72 0)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -2751,7 +2751,7 @@
     (in_bom yes) (on_board yes) (fields_autoplaced)
     (uuid 8babeafd-266b-4398-9be4-8b65502efc0f)
     (property "Reference" "R?" (id 0) (at 96.52 52.7136 90))
-    (property "Value" "R_Small" (id 1) (at 96.52 55.2505 90))
+    (property "Value" "100R" (id 1) (at 96.52 55.2505 90))
     (property "Footprint" "" (id 2) (at 96.52 57.15 0)
       (effects (font (size 1.27 1.27)) hide)
     )
@@ -3269,7 +3269,7 @@
       (reference "R?") (unit 1) (value "10k") (footprint "")
     )
     (path "/3db3fc00-95e4-4f1b-b3a5-5adfdb32b1bd"
-      (reference "R?") (unit 1) (value "R_Small") (footprint "")
+      (reference "R?") (unit 1) (value "100R") (footprint "")
     )
     (path "/4c9cff51-6d52-4202-bbc9-dbd5b4b813fb"
       (reference "R?") (unit 1) (value "1k") (footprint "")
@@ -3287,7 +3287,7 @@
       (reference "R?") (unit 1) (value "10k") (footprint "")
     )
     (path "/8babeafd-266b-4398-9be4-8b65502efc0f"
-      (reference "R?") (unit 1) (value "R_Small") (footprint "")
+      (reference "R?") (unit 1) (value "100R") (footprint "")
     )
     (path "/98b3911b-db95-4c27-a110-f1819e71215e"
       (reference "R?") (unit 1) (value "390R") (footprint "")
