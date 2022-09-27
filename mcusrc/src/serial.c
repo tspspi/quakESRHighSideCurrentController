@@ -4,6 +4,7 @@
 
 #include "main.h"
 #include "serial.h"
+#include "adc.h"
 
 #ifdef __cplusplus
     extern "C" {
@@ -869,6 +870,7 @@ static void serialModeTX() {
 		$$$VER:[version number]\n		Version of controller (monotonically incremented)
 		$$$RSETA:XXX\n					Currently set filament current
 		$$$RA:XXX\n						Measured filament current in mA
+        $$$ADC0:XXX\n                   Raw value of ADC0
 		$$$CALDATA:xxx:xxx\n			Offset and slope for calibration curve
 		$$$ERR\n						Unknown command or processing error
 */
@@ -878,6 +880,7 @@ static unsigned char handleSerialMessages_StringBuffer[SERIAL_RINGBUFFER_SIZE];
 static unsigned char handleSerialMessages_Response__ID[] = "$$$02fbc674-3e6a-11ed-ac01-b499badf00a1\n";
 static unsigned char handleSerialMessages_Response__VER[] = "$$$0\n";
 static unsigned char handleSerialMessages_Response__ERR[] = "$$$err\n";
+static unsigned char handleSerialMessages_Response__ADC0_Part[] = "$$$adc0:";
 
 /*@
 	requires acsl_serialbuffer_valid(&serialRB_RX);
@@ -897,6 +900,7 @@ static void handleSerialMessages_CompleteMessage(
 		Handle our message 
 	*/
     unsigned long int dwLen;
+    uint8_t sregOld;
 
     /*
         We have received a complete message - now we will remove the sync
@@ -923,17 +927,30 @@ static void handleSerialMessages_CompleteMessage(
 	} else if(strCompare("ver", 3, handleSerialMessages_StringBuffer, dwLen) == true) {
 		ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__VER, sizeof(handleSerialMessages_Response__VER)-1);
         serialModeTX();
-	} else if(strCompare("seta", 4, handleSerialMessages_StringBuffer, dwLen) == true) {
+	} else if(strComparePrefix("seta:", 5, handleSerialMessages_StringBuffer, dwLen) == true) {
 
 	} else if(strCompare("getseta", 7, handleSerialMessages_StringBuffer, dwLen) == true) {
 
 	} else if(strCompare("geta", 4, handleSerialMessages_StringBuffer, dwLen) == true) {
 
 	} else if(strCompare("getadc0", 7, handleSerialMessages_StringBuffer, dwLen) == true) {
+        uint16_t a;
+        {
+            sregOld = SREG;
+            #ifndef FRAMAC_SKIP
+                cli();
+            #endif
+            a = currentADC[0];
+            SREG = sregOld;
+            ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__ADC0_Part, sizeof(handleSerialMessages_Response__ADC0_Part)-1);
+            ringBuffer_WriteASCIIUnsignedInt(&serialRB_TX, a);
+            ringBuffer_WriteChar(&serialRB_TX, 0x0A);
+            serialModeTX();
+        }
 
 	} else if(strCompare("adccal0", 7, handleSerialMessages_StringBuffer, dwLen) == true) {
 
-	} else if(strCompare("adccalh:", 8, handleSerialMessages_StringBuffer, dwLen) == true) {
+	} else if(strComparePrefix("adccalh:", 8, handleSerialMessages_StringBuffer, dwLen) == true) {
 
 	} else if(strCompare("adccalstore", 11, handleSerialMessages_StringBuffer, dwLen) == true) {
 
