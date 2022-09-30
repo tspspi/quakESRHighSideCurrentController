@@ -21,11 +21,11 @@
 	ensures SPSR == 0x01;
 */
 static inline void mcp4822SPI_TransferBegin() {
-	SPCR = 0x50;
+	SPCR = 0x50 | 0x03;
 	SPSR = 0x01;
 
 	/* Chip select to low ... */
-	PORTD = PORTD & (~(0x80));
+	PORTD = PORTD & (~(0x08));
 }
 /*@
 	requires \valid(&SPCR) && \valid(&PORTD);
@@ -38,7 +38,7 @@ static inline void mcp4822SPI_TransferBegin() {
 */
 static inline void mcp4822SPI_TransferEnd() {
 	SPCR = 0x40;
-	PORTD = PORTD | 0x80;
+	PORTD = PORTD | 0x08;
 }
 /*@
 	requires \valid(&SPDR) && \valid(&SPSR);
@@ -58,15 +58,15 @@ static inline uint8_t mcp4822SPI_Transfer(uint8_t byteOut) {
 
 	assigns PORTD;
 
-	ensures (PORTD & 0x40) == 0x40;
+	ensures (PORTD & 0x04) == 0x04;
 */
 static inline void mcp4822SPI_LatchOutputs() {
-	PORTD = PORTD & (~0x40);
+	PORTD = PORTD & (~0x04);
 	/* Two NOPs to reach 100 ns minimum time (at 16 MHz each is ~ 62 ns) */
-	//@ assert (PORTD & 0x40) == 0;
+	//@ assert (PORTD & 0x04) == 0;
 	asm volatile("nop");
 	asm volatile("nop");
-	PORTD = PORTD | 0x40;
+	PORTD = PORTD | 0x04;
 }
 
 /*@
@@ -76,12 +76,14 @@ static inline void mcp4822SPI_LatchOutputs() {
 	assigns DDRD, PORTD;
 	assigns DDRB;
 	assigns SPCR, SPSR;
+	assigns PRR;
 
 	ensures (DDRD & 0x0C) == 0x0C;
 	ensures (PORTD & 0x0C) == 0x0C;
-	ensures ((DDRB & 0x14) == 0x14) && ((DDRB & 0x80) == 0);
+	ensures ((DDRB & 0x24) == 0x24) && ((DDRB & 0x80) == 0);
 	ensures (SPCR = 0x40) && (SPSR == 0x01);
 	ensures SREG == \old(SREG);
+	ensures PRR & 0x04 == 0x00;
 */
 void mcp4822Init() {
 	uint8_t sregOld = SREG;
@@ -94,8 +96,10 @@ void mcp4822Init() {
 			PD3 -> nCS
 			PD2 -> nLDAC
 			PB5 -> SCK
-			PB3 -> SDI
+			PB3 -> SDI (MOSI)
+			PB4 -> MISO
 
+			PB2 is slave select, should be configured as output
 
 		nCS -> output, high
 		nLDAC -> output, high
@@ -103,7 +107,11 @@ void mcp4822Init() {
 	*/
 	DDRD = DDRD | 0x0C;
 	PORTD = PORTD | 0x0C;
-	DDRB = (DDRB | 0x14) & (~(0x80));
+	DDRB = (DDRB | 0x2C) & (~(0x10));
+	PORTB = PORTB | 0x2C;
+
+	/* Disable power saving mode ... */
+	PRR = PRR & ~(0x04);
 
 	/* SPI master mode, enable logic */
 	SPCR = 0x40;
@@ -143,6 +151,7 @@ void mcp4822SetOutput(
 	mcp4822SPI_Transfer((uint8_t)((msg & 0xFF00) >> 8));
 	mcp4822SPI_Transfer((uint8_t)(msg & 0x00FF));
 	mcp4822SPI_TransferEnd();
+	mcp4822SPI_LatchOutputs();
 }
 
 #ifdef __cplusplus
