@@ -758,8 +758,11 @@ void serialInit() {
     ringBuffer_Init(&serialRB_TX);
     ringBuffer_Init(&serialRB_RX);
 
-    UBRR0   = 103; // 16 : 115200, 103: 19200
-    UCSR0A  = 0x02;
+    DDRD = (DDRD | 0x02) & (~0x01);
+    PORTD = PORTD & (~0x02);
+
+    UBRR0   = 832; // 16 : 115200, 103: 19200, 832 : 2400
+    UCSR0A  = 0x02; // Set U2X bit
     UCSR0B  = 0x10 | 0x80; /* Enable receiver and RX interrupt */
     UCSR0C  = 0x06;
 
@@ -877,7 +880,7 @@ static void serialModeTX() {
 
 static unsigned char handleSerialMessages_StringBuffer[SERIAL_RINGBUFFER_SIZE];
 
-static unsigned char handleSerialMessages_Response__ID[] = "$$$02fbc674-3e6a-11ed-ac01-b499badf00a1\n";
+static unsigned char handleSerialMessages_Response__ID[] = "$$$id:02fbc674-3e6a-11ed-ac01-b499badf00a1\n";
 static unsigned char handleSerialMessages_Response__VER[] = "$$$0\n";
 static unsigned char handleSerialMessages_Response__ERR[] = "$$$err\n";
 static unsigned char handleSerialMessages_Response__ADC0_Part[] = "$$$adc0:";
