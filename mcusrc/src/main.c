@@ -25,12 +25,16 @@ int main() {
 		Initialize ADC -> ok
 		Initiale USART -> ok
 	*/
+	CLKPR = 0x80;
+	CLKPR = 0;
+
 	sysclockInit();
 	serialInit();
 	adcInit();
 	mcp4822Init();
 	mcp4822SetOutput(0, 0, true, 0);
 	mcp4822SetOutput(1, 0, false, 0);
+	sei();
 
 	/* Endless loop ... */
 	for(;;) {
