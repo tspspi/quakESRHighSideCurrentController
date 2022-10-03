@@ -5,14 +5,18 @@
 #include "main.h"
 #include "serial.h"
 #include "adc.h"
+#include "mcp4822.h"
+#include "sysclock.h"
 
 #ifdef __cplusplus
     extern "C" {
 #endif
 
 #ifndef SERIAL_RINGBUFFER_SIZE
-    #define SERIAL_RINGBUFFER_SIZE 1024
+    #define SERIAL_RINGBUFFER_SIZE 256
 #endif
+
+static bool serial_ProtectionOutputCurrentEnabled;
 
 struct ringBuffer {
     volatile unsigned long int dwHead;
@@ -465,7 +469,7 @@ static void ringBuffer_WriteChar(
 */
 static void ringBuffer_WriteChars(
     volatile struct ringBuffer* lpBuf,
-    unsigned char* bData,
+    unsigned char* lpData,
     unsigned long int dwLen
 ) {
     unsigned long int i;
@@ -480,7 +484,7 @@ static void ringBuffer_WriteChars(
         loop variant dwLen - i;
     */
     for(i = 0; i < dwLen; i=i+1) {
-        ringBuffer_WriteChar(lpBuf, bData[i]);
+        ringBuffer_WriteChar(lpBuf, lpData[i]);
     }
 }
 /*@
@@ -750,6 +754,8 @@ static volatile struct ringBuffer serialRB_RX;
 	ensures SREG == \old(SREG);
 */
 void serialInit() {
+    serial_ProtectionOutputCurrentEnabled = true;
+
     uint8_t sregOld = SREG;
     #ifndef FRAMAC_SKIP
         cli();
@@ -759,7 +765,7 @@ void serialInit() {
     ringBuffer_Init(&serialRB_RX);
 
     DDRD = (DDRD | 0x02) & (~0x01);
-    PORTD = PORTD & (~0x02);
+    PORTD = PORTD | 0x02; /* Idle high */
 
     UBRR0   = 832; // 16 : 115200, 103: 19200, 832 : 2400
     UCSR0A  = 0x02; // Set U2X bit
@@ -816,7 +822,12 @@ ISR(USART_RX_vect) {
 ISR(USART_UDRE_vect) {
     if(ringBuffer_Available(&serialRB_TX) == true) {
         /* Shift next byte to the outside world ... */
-        UDR0 = ringBuffer_ReadChar(&serialRB_TX);
+        uint8_t temp = ringBuffer_ReadChar(&serialRB_TX);
+        UDR0 = temp;
+        if(ringBuffer_Available(&serialRB_TX) != true) {
+            /* Stop transmission after this character */
+            UCSR0B = UCSR0B & (~(0x08 | 0x20));
+        }
     } else {
         /*
             Since no more data is available for shifting simply stop
@@ -874,16 +885,18 @@ static void serialModeTX() {
 		$$$RSETA:XXX\n					Currently set filament current
 		$$$RA:XXX\n						Measured filament current in mA
         $$$ADC0:XXX\n                   Raw value of ADC0
-		$$$CALDATA:xxx:xxx\n			Offset and slope for calibration curve
 		$$$ERR\n						Unknown command or processing error
 */
 
 static unsigned char handleSerialMessages_StringBuffer[SERIAL_RINGBUFFER_SIZE];
 
 static unsigned char handleSerialMessages_Response__ID[] = "$$$id:02fbc674-3e6a-11ed-ac01-b499badf00a1\n";
-static unsigned char handleSerialMessages_Response__VER[] = "$$$0\n";
+static unsigned char handleSerialMessages_Response__VER[] = "$$$ver:0\n";
 static unsigned char handleSerialMessages_Response__ERR[] = "$$$err\n";
+static unsigned char handleSerialMessages_Response__OK[] = "$$$ok\n";
+static unsigned char handleSerialMessages_Response__SETA_Part[] = "$$$seta:";
 static unsigned char handleSerialMessages_Response__ADC0_Part[] = "$$$adc0:";
+static unsigned char handleSerialMessages_Response__GETA_Part[] = "$$$ra:";
 
 /*@
 	requires acsl_serialbuffer_valid(&serialRB_RX);
@@ -913,7 +926,7 @@ static void handleSerialMessages_CompleteMessage(
     dwLen = dwLength - 3;
     //@ assert dwLen > 2;
 
-    /* Remove end of line for next parser ... */
+     /* Remove end of line for next parser ... */
     dwLen = dwLen - 1; /* Remove LF */
     //@ assert dwLen > 0;
     dwLen = dwLen - ((ringBuffer_PeekCharN(&serialRB_RX, dwLen-1) == 0x0D) ? 1 : 0); /* Remove CR if present */
@@ -931,11 +944,29 @@ static void handleSerialMessages_CompleteMessage(
 		ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__VER, sizeof(handleSerialMessages_Response__VER)-1);
         serialModeTX();
 	} else if(strComparePrefix("seta:", 5, handleSerialMessages_StringBuffer, dwLen) == true) {
-
-	} else if(strCompare("getseta", 7, handleSerialMessages_StringBuffer, dwLen) == true) {
-
+        uint32_t newAmps = strASCIIToDecimal(&(handleSerialMessages_StringBuffer[5]), dwLen-5);
+        
+        if((newAmps > (CURRENTCONTROLLER_CURRENT_LIMIT * 10)) && (serial_ProtectionOutputCurrentEnabled == true)) {
+            ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__ERR, sizeof(handleSerialMessages_Response__ERR)-1);
+            serialModeTX();
+        } else {
+            mcp4822SetOutput(0, 0, true, newAmps);
+            ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__SETA_Part, sizeof(handleSerialMessages_Response__SETA_Part)-1);
+            ringBuffer_WriteASCIIUnsignedInt(&serialRB_TX, newAmps);
+            ringBuffer_WriteChar(&serialRB_TX, 0x0A);
+            serialModeTX();
+        }
+    } else if(strCompare("getseta", 7, handleSerialMessages_StringBuffer, dwLen) == true) {
+        ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__SETA_Part, sizeof(handleSerialMessages_Response__SETA_Part)-1);
+        ringBuffer_WriteASCIIUnsignedInt(&serialRB_TX, mcp4822_CurrentValues[0]);
+        ringBuffer_WriteChar(&serialRB_TX, 0x0A);
+        serialModeTX();
 	} else if(strCompare("geta", 4, handleSerialMessages_StringBuffer, dwLen) == true) {
-
+        uint16_t a = adcCountsToCurrentMA();
+        ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__GETA_Part, sizeof(handleSerialMessages_Response__GETA_Part)-1);
+        ringBuffer_WriteASCIIUnsignedInt(&serialRB_TX, a);
+        ringBuffer_WriteChar(&serialRB_TX, 0x0A);
+        serialModeTX();
 	} else if(strCompare("getadc0", 7, handleSerialMessages_StringBuffer, dwLen) == true) {
         uint16_t a;
         {
@@ -950,15 +981,27 @@ static void handleSerialMessages_CompleteMessage(
             ringBuffer_WriteChar(&serialRB_TX, 0x0A);
             serialModeTX();
         }
-
 	} else if(strCompare("adccal0", 7, handleSerialMessages_StringBuffer, dwLen) == true) {
-
+        adcCalLow();
+		ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__OK, sizeof(handleSerialMessages_Response__OK)-1);
+        serialModeTX();
 	} else if(strComparePrefix("adccalh:", 8, handleSerialMessages_StringBuffer, dwLen) == true) {
-
+        uint32_t highMilliamps = strASCIIToDecimal(&(handleSerialMessages_StringBuffer[8]), dwLen-8);
+        adcCalHigh((uint16_t)highMilliamps);
+		ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__OK, sizeof(handleSerialMessages_Response__OK)-1);
+        serialModeTX();
 	} else if(strCompare("adccalstore", 11, handleSerialMessages_StringBuffer, dwLen) == true) {
-
-	} else if(strCompare("adccalget", 9, handleSerialMessages_StringBuffer, dwLen) == true) {
-
+        adcCalStore();
+        ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__OK, sizeof(handleSerialMessages_Response__OK)-1);
+        serialModeTX();
+    } else if(strCompare("disableprotection", 17, handleSerialMessages_StringBuffer, dwLen) == true) {
+        serial_ProtectionOutputCurrentEnabled = false;
+        ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__OK, sizeof(handleSerialMessages_Response__OK)-1);
+        serialModeTX();
+    } else if(strCompare("enableprotection", 16, handleSerialMessages_StringBuffer, dwLen) == true) {
+        serial_ProtectionOutputCurrentEnabled = true;
+        ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__OK, sizeof(handleSerialMessages_Response__OK)-1);
+        serialModeTX();
 	} else {
 		ringBuffer_WriteChars(&serialRB_TX, handleSerialMessages_Response__ERR, sizeof(handleSerialMessages_Response__ERR)-1);
         serialModeTX();
