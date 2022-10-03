@@ -26,6 +26,15 @@ extern uint16_t currentADC[ADCCOUNT];
 */
 void adcInit();
 
+uint16_t adcCountsToCurrentMA();
+void adcCalLow();
+void adcCalHigh(uint16_t milliAmps);
+void adcCalStore();
+
+double adcCalGet_K();
+double adcCalGet_D();
+
+
 #ifdef __cplusplus
     } /* extern "C" { */
 #endif

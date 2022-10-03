@@ -1,5 +1,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/eeprom.h>
 #include <math.h>
 #include <util/twi.h>
 #include <stdint.h>
@@ -13,6 +14,11 @@
 
 uint16_t currentADC[ADCCOUNT];
 
+static double adcCal_K, adcCal_D;
+static uint16_t adcCalLow_Counts;
+static uint16_t adcCalHigh_Counts;
+static uint16_t adcCalHigh_Milliamps;
+
 /*@
 	requires \valid(&ADC) && \valid(&ADMUX);
 
@@ -23,6 +29,13 @@ ISR(ADC_vect) {
     currentADC[(oldMUX + (ADCCOUNT-1)) % ADCCOUNT] = ADC;
     ADMUX = (((oldMUX & 0x1F) + 1) % ADCCOUNT) | (oldMUX & 0xE0);
 }
+
+struct eepromCalData {
+    double adc0_K;
+    double adc0_D;
+
+    uint8_t chkSum;
+};
 
 /*@
 	requires \valid(&ADMUX) && \valid(&ADCSRB) && \valid(&ADCSRA) && \valid(&SREG);
@@ -39,6 +52,7 @@ ISR(ADC_vect) {
 */
 void adcInit() {
     unsigned long int i;
+    struct eepromCalData calData;
 
     uint8_t oldSREG = SREG;
     #ifndef FRAMAC_SKIP
@@ -57,8 +71,93 @@ void adcInit() {
 
     /* Launch ADC ... */
     ADCSRA = ADCSRA | 0x40; /* Start first conversion ... */
+
+    /*
+        Load calibration data (if exists)...
+    */
+    eeprom_read_block(&calData, EEPROM_ADCCALDATAOFFSET, sizeof(struct eepromCalData));
+    uint8_t chkSum = 0;
+    for(i = 0; i < sizeof(struct eepromCalData); i=i+1) {
+        chkSum = chkSum ^ ((uint8_t*)(&calData))[i];
+    }
+    if(chkSum == 0) {
+        adcCal_D = calData.adc0_D;
+        adcCal_K = calData.adc0_K;
+    } else {
+        adcCal_D = 0;
+        adcCal_K = 0.522448979592;
+    }
 }
 
+
+
+uint16_t adcCountsToCurrentMA() {
+    uint16_t a;
+    /*
+        Apply our calibration curve ... currently in code, this should be stored in EEPROM ...
+    */
+    uint8_t sregOld = SREG;
+    #ifndef FRAMAC_SKIP
+        cli();
+    #endif
+    a = currentADC[0];
+    SREG = sregOld;
+
+    return (uint16_t)(((double)(a) * adcCal_K) + adcCal_D);
+}
+
+static void adcRecalculateKD() {
+    if((adcCalHigh_Counts == adcCalLow_Counts) || (adcCalLow_Counts > adcCalHigh_Counts)) {
+        /* Use some sane default values ... */
+        adcCal_D = 0;
+        adcCal_K = 0.522448979592;
+    } else {
+        adcCal_K = ((double)adcCalHigh_Milliamps) / ((double)adcCalHigh_Counts - (double)adcCalLow_Counts);
+        adcCal_D = -1.0 * adcCal_K * ((double)adcCalLow_Counts);
+    }
+}
+
+void adcCalLow() {
+    uint8_t sregOld = SREG;
+    #ifndef FRAMAC_SKIP
+        cli();
+    #endif
+    adcCalLow_Counts = currentADC[0];
+    SREG = sregOld;
+
+    adcRecalculateKD();
+}
+
+void adcCalHigh(uint16_t milliAmps) {
+    uint8_t sregOld = SREG;
+    #ifndef FRAMAC_SKIP
+        cli();
+    #endif
+    adcCalHigh_Counts = currentADC[0];
+    adcCalHigh_Milliamps = milliAmps;
+    SREG = sregOld;
+
+    adcRecalculateKD();
+}
+
+void adcCalStore() {
+    struct eepromCalData calData;
+    calData.adc0_D = adcCal_D;
+    calData.adc0_K = adcCal_K;
+    calData.chkSum = 0;
+
+    uint8_t chkSum = 0x00;
+    unsigned long int i;
+    for(i = 0; i < sizeof(struct eepromCalData); i=i+1) {
+        chkSum = chkSum ^ ((uint8_t*)(&calData))[i];
+    }
+    calData.chkSum = chkSum;
+
+    eeprom_write_block(&calData, EEPROM_ADCCALDATAOFFSET, sizeof(struct eepromCalData));
+}
+
+double adcCalGet_K() { return adcCal_K; }
+double adcCalGet_D() { return adcCal_D; }
 
 #ifdef __cplusplus
     } /* extern "C" { */
