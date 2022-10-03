@@ -1,6 +1,13 @@
 #ifndef __is_included__790c9d24_3e4e_11ed_ac01_b499badf00a1
 #define __is_included__790c9d24_3e4e_11ed_ac01_b499badf00a1 
 
+/* Defined in milliamps and enforced on controller level! */
+#ifndef CURRENTCONTROLLER_CURRENT_LIMIT
+	#define CURRENTCONTROLLER_CURRENT_LIMIT 130
+#endif
+
+#define EEPROM_ADCCALDATAOFFSET 0
+
 /*@
 	axiomatic hardware_registers {
 		axiom valid_SREG: \valid(&SREG);
@@ -43,10 +50,6 @@
 		typedef unsigned char bool;
 	#endif
 #endif
-
-
-
-
 
 #ifdef __cplusplus
 	}
