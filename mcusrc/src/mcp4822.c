@@ -1,3 +1,5 @@
+#define __is_in_module__142e0c51_431e_11ed_9e74_b499badf00a1 1
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <math.h>
@@ -8,6 +10,8 @@
 #ifdef __cplusplus
 	extern "C" {
 #endif
+
+uint16_t mcp4822_CurrentValues[2] = { 0, 0 };
 
 /*@
 	requires \valid(&SPCR) && \valid(&SPSR) && \valid(&PORTD);
@@ -118,6 +122,10 @@ void mcp4822Init() {
 	SPSR = 0x01;
 
 	SREG = sregOld;
+
+	/* Set our output values to 0 */
+	mcp4822SetOutput(0, 0, false, 0);
+	mcp4822SetOutput(1, 0, false, 0);
 }
 
 /*@
@@ -152,6 +160,8 @@ void mcp4822SetOutput(
 	mcp4822SPI_Transfer((uint8_t)(msg & 0x00FF));
 	mcp4822SPI_TransferEnd();
 	mcp4822SPI_LatchOutputs();
+
+	mcp4822_CurrentValues[channel] = value;
 }
 
 #ifdef __cplusplus

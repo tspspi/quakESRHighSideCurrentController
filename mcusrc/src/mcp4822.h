@@ -34,6 +34,10 @@ void mcp4822SetOutput(
 	uint16_t value
 );
 
+#ifndef __is_in_module__142e0c51_431e_11ed_9e74_b499badf00a1
+	extern uint16_t mcp4822_CurrentValues[2];
+#endif
+
 #ifdef __cplusplus
 	} /* extern "C" { */
 #endif
