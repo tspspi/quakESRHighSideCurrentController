@@ -747,7 +747,7 @@ static volatile struct ringBuffer serialRB_RX;
 	ensures (serialRB_TX.dwHead == 0) && (serialRB_TX.dwTail == 0);
 	ensures (serialRB_RX.dwHead == 0) && (serialRB_RX.dwTail == 0);
 
-	ensures UBRR0 == 103;
+	ensures UBRR0 == 832;
 	ensures UCSR0A == 0x02;
 	ensures UCSR0B == 0x90;
 	ensures UCSR0C == 0x06;
@@ -804,6 +804,7 @@ ISR(USART_RX_vect) {
 
 		assigns UDR0;
 		assigns serialRB_TX.dwTail;
+        assigns UCSR0B;
 
 		ensures serialRB_TX.dwTail == (\old(serialRB_TX.dwTail) + 1) % SERIAL_RINGBUFFER_SIZE;
 		ensures UDR0 == serialRB_TX.buffer[\old(serialRB_TX.dwTail)];
