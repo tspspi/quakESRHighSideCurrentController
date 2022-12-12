@@ -5,6 +5,8 @@
 #include <util/twi.h>
 #include <stdint.h>
 
+#define CURRENT_MEASURE_ADC 1
+
 #include "./adc.h"
 #include "./main.h"
 
@@ -100,7 +102,7 @@ uint16_t adcCountsToCurrentMA() {
     #ifndef FRAMAC_SKIP
         cli();
     #endif
-    a = currentADC[0];
+    a = currentADC[CURRENT_MEASURE_ADC];
     SREG = sregOld;
 
     return (uint16_t)(((double)(a) * adcCal_K) + adcCal_D);
@@ -122,7 +124,7 @@ void adcCalLow() {
     #ifndef FRAMAC_SKIP
         cli();
     #endif
-    adcCalLow_Counts = currentADC[0];
+    adcCalLow_Counts = currentADC[CURRENT_MEASURE_ADC];
     SREG = sregOld;
 
     adcRecalculateKD();
@@ -133,7 +135,7 @@ void adcCalHigh(uint16_t milliAmps) {
     #ifndef FRAMAC_SKIP
         cli();
     #endif
-    adcCalHigh_Counts = currentADC[0];
+    adcCalHigh_Counts = currentADC[CURRENT_MEASURE_ADC];
     adcCalHigh_Milliamps = milliAmps;
     SREG = sregOld;
 
