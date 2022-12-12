@@ -2,7 +2,10 @@ CPUFREQ=16000000L
 FLASHDEV=/dev/ttyU0
 FLASHBAUD=57600
 #FLASHMETHOD=avrisp
-FLASHMETHOD=arduino
+#FLASHMETHOD=arduino
+FLASHMETHOD=stk500
+#MMCU=atmega328p
+MMCU=atmega328
 
 SRCFILES=src/main.c \
 	src/sysclock.c \
@@ -18,7 +21,7 @@ HEADFILES=src/main.h \
 all: bin/controller.hex
 
 bin/controller.bin: $(SRCFILES) $(HEADFILES)
-	avr-gcc -Wall -Os -mmcu=atmega328 -DF_CPU=$(CPUFREQ) -o bin/controller.bin $(SRCFILES)
+	avr-gcc -Wall -Os -mmcu=$(MMCU) -DF_CPU=$(CPUFREQ) -o bin/controller.bin $(SRCFILES)
 
 bin/controller.hex: bin/controller.bin
 
@@ -28,7 +31,12 @@ bin/controller.hex: bin/controller.bin
 flash: bin/controller.hex
 
 	sudo chmod 666 $(FLASHDEV)
-	avrdude -v -p atmega328 -c $(FLASHMETHOD) -P $(FLASHDEV) -b $(FLASHBAUD) -U lfuse:w:0x7F:m -U flash:w:bin/controller.hex:i
+ifeq ($(FLASHMETHOD),stk500)
+	avrdude -v -p $(MMCU) -c $(FLASHMETHOD) -P $(FLASHDEV)  -U lfuse:w:0x7F:m -U flash:w:bin/controller.hex:i
+	# Fuse 0x68
+else
+	avrdude -v -p $(MMCU) -c $(FLASHMETHOD) -P $(FLASHDEV) -b $(FLASHBAUD) -U lfuse:w:0x7F:m -U flash:w:bin/controller.hex:i
+endif
 
 framac: $(SRCFILES) $(HEADFILES)
 
