@@ -5,7 +5,7 @@
 #include <util/twi.h>
 #include <stdint.h>
 
-#define CURRENT_MEASURE_ADC 1
+#define CURRENT_MEASURE_ADC 0
 
 #include "./adc.h"
 #include "./main.h"
