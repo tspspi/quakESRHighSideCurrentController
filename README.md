@@ -1,5 +1,7 @@
 # Simple 500 mA high voltage biasable current source
 
+![DOI: 10.5281/zenodo.17522046](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.17522046-blue.svg)
+
 This project contains a simple OpAmp and MosFET based current supply
 that can be controlled using a serial port. The whole project is built
 around an ```IRF540N``` MosFET that's driven by an ```LM358``` OpAmp in a way
