@@ -1,0 +1,14 @@
+{
+	"title" : "QuakESR High-Side Current Controller",
+	"creators" : [
+		{ "name" : "Thomas Spielauer", "orcid" : "0009-0002-0979-7880" }
+	],
+	"description" : "Schematics, PCB layouts, firmware and documentation for the QuakESR High-Side Current Controller used in electron-beam spin resonance experiments.",
+	"keywords" : [ "EPR", "ESR", "Instrumentation", "Electronics", "Electron Gun", "Electron Source", "Power Supply" ],
+	"license" : "BSD-2-Clause",
+	"upload_type" : "software",
+	"access_right" : "open",
+	"related_identifiers" : [
+		{ "identifier" : "https://github.com/tspspi/quakESRHighSideCurrentController", "relation" : "isSupplementTo", "resource_type" : "software" }
+	]
+}
